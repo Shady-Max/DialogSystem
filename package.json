@@ -3,10 +3,6 @@
     "version": "0.0.1",
     "displayName": "DialogSystem",
     "description": "This is a dialog system",
-    "dependencies": {
-        "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git",
-        "com.messagepack.csharp": "https://github.com/MessagePack-CSharp/MessagePack-CSharp.git"
-    },
     "author": {
         "name": "ShadyMax",
         "email": "kolodin2005@gmail.com"

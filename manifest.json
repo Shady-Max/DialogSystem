@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git",
+    "com.messagepack.csharp": "https://github.com/MessagePack-CSharp/MessagePack-CSharp.git"
+  }
+}
