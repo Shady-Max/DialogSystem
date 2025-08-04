@@ -1,6 +1,6 @@
 {
     "name": "DialogSystem",
-    "rootNamespace": "ShadyMax",
+    "rootNamespace": "ShadyMax.DialogSystem",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

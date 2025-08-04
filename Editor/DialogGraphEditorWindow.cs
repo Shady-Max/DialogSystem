@@ -81,7 +81,8 @@ namespace ShadyMax.DialogSystem.Editor
             
             _graphView = new DialogGraphView();
             
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/Styles/DialogGraph.uss");
+            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/Editor/Styles/DialogGraph.uss") ?? AssetDatabase.LoadAssetAtPath<StyleSheet>("Packages/DialogSystem/Editor/Styles/DialogGraph.uss");
+            Debug.Log(styleSheet);
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);
@@ -160,7 +161,7 @@ namespace ShadyMax.DialogSystem.Editor
                 CreateGraphView();
             }
 
-            _graphView.LoadGraph(graph);
+            _graphView!.LoadGraph(graph);
             _hasUnsavedChanges = false;
             UpdateWindowTitle();
 

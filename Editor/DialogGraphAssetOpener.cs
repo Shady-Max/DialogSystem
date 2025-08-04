@@ -11,12 +11,12 @@ namespace ShadyMax.DialogSystem.Editor
         {
             // Try to get the asset
             var obj = EditorUtility.InstanceIDToObject(instanceID);
-            /*if (obj is DialogGraph dialogGraph)
+            if (obj is DialogGraphEditor dialogGraph)
             {
                 var window = EditorWindow.GetWindow<DialogGraphEditorWindow>("Dialog Graph");
                 window.LoadGraph(dialogGraph);
                 return true; // Mark as handled
-            }*/
+            }
 
             return false; // Not handled
         }
