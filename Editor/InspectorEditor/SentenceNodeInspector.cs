@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using ShadyMax.DialogSystem.Editor.Nodes;
 using UnityEditor;
 using UnityEditor.Localization;
@@ -10,18 +11,18 @@ using UnityEngine.Localization.Tables;
 namespace ShadyMax.DialogSystem.Editor.InspectorEditor
 {
     [CustomEditor(typeof(SentenceNodeEditor))]
-    public class SentenceNodeInspector : UnityEditor.Editor
+    public class SentenceNodeInspector : BaseNodeInspector<SentenceNodeEditor>
     {
-        private SentenceNodeEditor _target;
         private LocalizationTableCollection _tableCollection;
         private List<Locale> _availableLocales;
         private Dictionary<Locale, string> _localizedValues = new Dictionary<Locale, string>();
         private Vector2 _scrollPosition;
         private bool _needsSave = false;
 
-        private void OnEnable()
+        protected new void OnEnable()
         {
-            _target = (SentenceNodeEditor)target;
+            base.OnEnable();
+            Undo.undoRedoPerformed += OnUndoRedoPerformed;
             RefreshLocalizationData();
         }
         
@@ -61,7 +62,7 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
         private void UpdateTranslation(Locale locale, string key, string newValue
         )
         {
-            if (_tableCollection == null)
+            if (_tableCollection == null || string.IsNullOrEmpty(key))
             {
                 Debug.LogError("Table collection is null!");
                 return;
@@ -91,35 +92,39 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
             {
                 sharedEntry = table.SharedData.GetEntry(key);
             }
-            
-            // Update or create the localized value
-            var entry = table.GetEntry(sharedEntry.Id);
-            if (entry == null)
+
+            if (sharedEntry != null)
             {
-                entry = table.AddEntry(sharedEntry.Id, newValue);
+
+                // Update or create the localized value
+                var entry = table.GetEntry(sharedEntry.Id);
+                if (entry == null)
+                {
+                    entry = table.AddEntry(sharedEntry.Id, newValue);
+                }
+                else
+                {
+                    entry.Value = newValue;
+                }
+
+
+
+
+                EditorUtility.SetDirty(table);
+                EditorUtility.SetDirty(table.SharedData);
+                EditorUtility.SetDirty(_tableCollection);
+
+                _needsSave = true;
             }
-            else
-            {
-                entry.Value = newValue;
-            }
-
-
-
-            
-            EditorUtility.SetDirty(table);
-            EditorUtility.SetDirty(table.SharedData);
-            EditorUtility.SetDirty(_tableCollection);
-
-            _needsSave = true;
         }
 
 
 
         public override void OnInspectorGUI()
         {
+            base.OnInspectorGUI();
             serializedObject.Update();
-            EditorGUI.BeginChangeCheck();
-
+            
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Node Data", EditorStyles.boldLabel);
             using (new EditorGUI.IndentLevelScope())
@@ -149,20 +154,24 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
             {
                 using (new EditorGUI.IndentLevelScope())
                 {
-                    _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition, GUILayout.Height(200));
+                    _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition, GUILayout.ExpandHeight(true), GUILayout.MinHeight(20), GUILayout.MaxHeight(200));
 
                     foreach (var locale in _availableLocales)
                     {
+                        string currentValue = _localizedValues.ContainsKey(locale) ? _localizedValues[locale] : string.Empty;
+
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField(locale.name, GUILayout.Width(100));
-                        string currentValue = _localizedValues.ContainsKey(locale) ? _localizedValues[locale] : string.Empty;
+                        
+                        EditorGUI.BeginChangeCheck();
                         string newValue = EditorGUILayout.TextField(currentValue);
-                        EditorGUILayout.EndHorizontal();
                         if (EditorGUI.EndChangeCheck())
                         {
                             UpdateTranslation(locale, _target.Guid, newValue);
                             _localizedValues[locale] = newValue;
                         }
+                        
+                        EditorGUILayout.EndHorizontal();
                         EditorGUILayout.Space(5);
                     }
 
@@ -170,19 +179,6 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
 
                 }
             }
-
-
-            // Node Properties Section
-            EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField("Node Properties", EditorStyles.boldLabel);
-            using (new EditorGUI.IndentLevelScope())
-            {
-                EditorGUI.BeginDisabledGroup(true); // Make these read-only
-                EditorGUILayout.Vector2Field("Position", _target.Position);
-                EditorGUILayout.TextField("GUID", _target.Guid);
-                EditorGUI.EndDisabledGroup();
-            }
-
 
             // Add any additional custom fields here
 
@@ -197,15 +193,13 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
             }*/
 
             
-            if (EditorGUI.EndChangeCheck())
-            {
-                serializedObject.ApplyModifiedProperties();
-                _target.OnDataChanged?.Invoke();
-            }
+            serializedObject.ApplyModifiedProperties(); 
+            _target.OnDataChanged?.Invoke();
         }
         
         private void OnDisable()
         {
+            Undo.undoRedoPerformed -= OnUndoRedoPerformed;
             if (_needsSave)
             {
                 AssetDatabase.SaveAssets();
@@ -213,6 +207,10 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
             }
         }
 
+        private void OnUndoRedoPerformed()
+        {
+            RefreshLocalizationData();
+        }
 
     }
 }

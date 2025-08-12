@@ -49,6 +49,7 @@ namespace ShadyMax.DialogSystem.Editor
             if (_graphView != null)
             {
                 _graphView.GraphChanged -= OnGraphChanged;
+                _graphView.UnloadGraph();
             }
         }
         

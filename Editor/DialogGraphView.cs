@@ -25,7 +25,8 @@ namespace ShadyMax.DialogSystem.Editor
         
         private static readonly Dictionary<Type, Type> NodeToViewMapping = new()
         {
-            {typeof(SentenceNodeEditor), typeof(SentenceNodeView)}
+            {typeof(SentenceNodeEditor), typeof(SentenceNodeView)},
+            {typeof(AnswerNodeEditor), typeof(AnswerNodeView)}
         };
         
 
@@ -188,7 +189,7 @@ namespace ShadyMax.DialogSystem.Editor
             return _lastRightClickPosition;
         }
 
-        public void CreateNode(Type type, Vector2 screenMousePosition)
+        public void CreateNode(Type type)
         {
             if (!typeof(BaseNodeEditor).IsAssignableFrom(type))
                 return;
@@ -200,6 +201,7 @@ namespace ShadyMax.DialogSystem.Editor
             newNode!.name = $"{type.Name}_{guid}";
             newNode.Guid = guid;
             newNode.tableReference = _dialogReference.localizationTable;
+            newNode.Position = _lastRightClickPosition;
 
             Debug.Log(newNode != null);
             Debug.Log(_dialogReference != null);
@@ -240,9 +242,17 @@ namespace ShadyMax.DialogSystem.Editor
             
             var elementsToDelete = elements.ToList();
             
-            // Register undo for the entire graph before deletion
-            Undo.RegisterCompleteObjectUndo(_dialogReference, "Delete Dialog Elements");
+            var objectsToUndo = new List<Object> { _dialogReference };
+            
+            foreach (var element in elementsToDelete)
+            {
+                if (element is Node node && node.userData is BaseNodeEditor nodeEditor)
+                {
+                    objectsToUndo.Add(nodeEditor);
+                }
+            }
 
+            Undo.RegisterCompleteObjectUndo(objectsToUndo.ToArray(), "Delete Dialog Elements");
 
             foreach (var element in elementsToDelete)
             {
@@ -258,7 +268,15 @@ namespace ShadyMax.DialogSystem.Editor
                     if (node.userData is BaseNodeEditor bn && _dialogReference.nodes.Contains(bn))
                     {
                         string guid = bn.Guid;
-                        bn.name = $"DELETED_{guid}";
+                        
+                        SerializedObject so = new SerializedObject(bn);
+                        SerializedProperty guidProp = so.FindProperty("_guid");
+                        string storedGuid = guidProp.stringValue;
+                        
+                        Undo.RecordObject(bn, "Mark Node As Deleted");
+                        bn.name = $"DELETED_{storedGuid}";
+                        bn.Guid = "";
+                        bn.hideFlags = HideFlags.HideInHierarchy;
                         
                         _dialogReference.nodes.Remove(bn);
                         Undo.DestroyObjectImmediate(bn);
@@ -314,7 +332,11 @@ namespace ShadyMax.DialogSystem.Editor
         {
             if (graph == null) return;
             if (_dialogReference == graph && !forceReload) return;
-            
+            if (_dialogReference != null)
+            {
+                _dialogReference.CleanupDeletedNodes();
+            }
+
             ClearGraphView();
             _dialogReference = graph;
             
@@ -547,6 +569,17 @@ namespace ShadyMax.DialogSystem.Editor
                 }
             }*/
         }
+        
+        public void UnloadGraph()
+        {
+            if (_dialogReference != null)
+            {
+                _dialogReference.CleanupDeletedNodes();
+            }
+            ClearGraphView();
+            _dialogReference = null;
+        }
+
 
         private new Node GetNodeByGuid(string guid)
         {
@@ -566,6 +599,7 @@ namespace ShadyMax.DialogSystem.Editor
 
         public void OnDestroy()
         {
+            UnloadGraph();
             Undo.undoRedoPerformed -= OnUndoRedo;
         }
         
@@ -574,7 +608,27 @@ namespace ShadyMax.DialogSystem.Editor
             // Reload the graph to reflect changes
             if (_dialogReference != null)
             {
+                foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GetAssetPath(_dialogReference)))
+                {
+                    if (asset is BaseNodeEditor node && node.hideFlags == HideFlags.HideInHierarchy)
+                    {
+                        node.hideFlags = HideFlags.None;
+                        node.Initialize(); // This will restore the proper name and GUID
+                        EditorUtility.SetDirty(node);
+                    }
+                }
+
+                
                 LoadGraph(_dialogReference, true);
+                
+                foreach (var nodeView in nodes.ToList())
+                {
+                    if (nodeView is INodeView view && nodeView.userData is BaseNodeEditor nodeEditor)
+                    {
+                        view.Initialize(nodeEditor, this);
+                    }
+                }
+
                 GraphChanged?.Invoke();
             }
         }
