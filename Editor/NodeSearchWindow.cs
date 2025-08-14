@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using ShadyMax.DialogSystem.Editor.Nodes;
+using ShadyMax.DialogSystem.Editor.Variables;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace ShadyMax.DialogSystem.Editor
 {
@@ -29,7 +31,8 @@ namespace ShadyMax.DialogSystem.Editor
                  new SearchTreeGroupEntry(new GUIContent("Logic"), 1),
                  /*new SearchTreeEntry(new GUIContent("And")) {level = 2, userData = typeof(BaseNodeEditor)},
                  new SearchTreeEntry(new GUIContent("Or")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("If")) {level = 2, userData = typeof(BaseNodeEditor)},*/
+                 new SearchTreeEntry(new GUIContent("Not")) {level = 2, userData = typeof(BaseNodeEditor)},*/
+                 new SearchTreeEntry(new GUIContent("If")) {level = 2, userData = typeof(IfNodeEditor)},
                  
                  new SearchTreeGroupEntry(new GUIContent("Math"), 1),
                  /*new SearchTreeEntry(new GUIContent("Add")) {level = 2, userData = typeof(BaseNodeEditor)},
@@ -43,18 +46,40 @@ namespace ShadyMax.DialogSystem.Editor
                  new SearchTreeEntry(new GUIContent("Int")) {level = 2, userData = typeof(BaseNodeEditor)},
                  new SearchTreeEntry(new GUIContent("String")) {level = 2, userData = typeof(BaseNodeEditor)},
                  new SearchTreeEntry(new GUIContent("Bool")) {level = 2, userData = typeof(BaseNodeEditor)},*/
+                 
+                 new SearchTreeGroupEntry(new GUIContent("Variables"), 1),
+                 /*
+                  new SearchTreeEntry(new GUIContent("Set")) {level = 2, userData = typeof(BaseNodeEditor)},
+                  */
             };
+
+            foreach (var variable in _graphView.DialogReference.variables)
+            {
+                tree.Add(new SearchTreeEntry(new GUIContent(variable.name)) {level = 2, userData = variable});
+            }
             return tree;
         }
 
         public bool OnSelectEntry(SearchTreeEntry SearchTreeEntry, SearchWindowContext context)
         {
-            if (SearchTreeEntry.userData is Type nodeType)
+            if (SearchTreeEntry.userData is Type nodeType && 
+                (nodeType.IsSubclassOf(typeof(BaseNodeEditor)) || nodeType == typeof(BaseNodeEditor)))
             {
                 _graphView.CreateNode(nodeType);
                 return true;
-            }
+            } 
+            if (SearchTreeEntry.userData is BaseVariable variable)
+            {
+                Rect worldRect = _graphView.layout;
+                worldRect.position = Vector2.zero;
 
+                // Middle point in local coordinates
+                Vector2 localCenter = worldRect.center;
+                Vector2 position = _graphView.contentViewContainer.WorldToLocal(_graphView.LocalToWorld(localCenter));
+                
+                _graphView.CreateVariableGetNode(variable.guid, position);
+                return true;
+            }
             return false;
         }
     }

@@ -27,6 +27,8 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
             SetPosition(new Rect(node.Position, new Vector2(200, 150)));
             RefreshExpandedState();
             RefreshPorts();
+            
+            EditorApplication.delayCall += RefreshUI;
         }
 
         private void OnDataChanged()

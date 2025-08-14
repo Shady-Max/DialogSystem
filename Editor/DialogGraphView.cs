@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Codice.CM.SEIDInfo;
 using ShadyMax.DialogSystem.Editor.Nodes;
+using ShadyMax.DialogSystem.Editor.Variables;
 using ShadyMax.DialogSystem.Editor.ViewNodes;
 using ShadyMax.DialogSystem.Runtime.Nodes;
 using UnityEditor;
@@ -16,17 +17,21 @@ namespace ShadyMax.DialogSystem.Editor
     public class DialogGraphView : GraphView
     {
         public Action GraphChanged;
+        public DialogGraphEditor DialogReference => _dialogReference;
 
         private DialogGraphEditor _dialogReference;
         private NodeSearchWindow _nodeSearchWindow;
-        private Blackboard _blackboard;
+        private VariableBlackboard _blackboard;
         
         private Vector2 _lastRightClickPosition;
         
         private static readonly Dictionary<Type, Type> NodeToViewMapping = new()
         {
+            {typeof(BeginNodeEditor), typeof(BeginNodeView)},
             {typeof(SentenceNodeEditor), typeof(SentenceNodeView)},
-            {typeof(AnswerNodeEditor), typeof(AnswerNodeView)}
+            {typeof(AnswerNodeEditor), typeof(AnswerNodeView)},
+            {typeof(IfNodeEditor), typeof(IfNodeVIew)},
+            {typeof(VariableGetNodeEditor), typeof(VariableGetNodeView)}
         };
         
 
@@ -39,6 +44,7 @@ namespace ShadyMax.DialogSystem.Editor
             AddSearchWindow();
             RegisterCallbacks();
             Undo.undoRedoPerformed += OnUndoRedo;
+            AssemblyReloadEvents.afterAssemblyReload += OnAfterDomainReload;
         }
 
 
@@ -90,8 +96,80 @@ namespace ShadyMax.DialogSystem.Editor
                 }
             });
             
-            graphViewChanged = OnGraphViewChanged;
+            RegisterCallback<DragUpdatedEvent>(evt =>
+            {
+                if (DragAndDrop.GetGenericData("BlackboardField") != null)
+                {
+                    DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+                    evt.StopPropagation();
+                }
+            });
+            
+            RegisterCallback<DragPerformEvent>(evt =>
+            {
+                var variable = DragAndDrop.GetGenericData("BlackboardField") as BaseVariable;
+                if (variable != null)
+                {
+                    DragAndDrop.AcceptDrag();
+
+                    // Convert mouse position to graph space
+                    var localMousePos = contentViewContainer.WorldToLocal(evt.mousePosition);
+
+                    // Create your node here
+                    CreateVariableGetNode(variable.guid, localMousePos);
+                }
+            });
+            
+            graphViewChanged += OnGraphViewChanged;
         }
+        
+        public void CreateVariableGetNode(string variableGuid, Vector2 position)
+        {
+            var type = typeof(VariableGetNodeEditor);
+            VariableGetNodeEditor newGetNode = ScriptableObject.CreateInstance<VariableGetNodeEditor>();
+            if (newGetNode == null) return;
+
+            var guid = Guid.NewGuid().ToString();
+            newGetNode!.name = $"{type.Name}_{guid}";
+            newGetNode.variableGuid = variableGuid;
+            newGetNode.Guid = guid;
+            newGetNode.tableReference = _dialogReference.localizationTable;
+            newGetNode.Position = position;
+
+            Debug.Log(newGetNode != null);
+            Debug.Log(_dialogReference != null);
+            
+            Undo.RegisterCompleteObjectUndo(new Object[] { newGetNode, _dialogReference }, "Create Node");
+
+            AssetDatabase.AddObjectToAsset(newGetNode, _dialogReference);
+            AssetDatabase.SaveAssets();
+            
+            _dialogReference.nodes.Add(newGetNode);
+
+            CreateNodeView(newGetNode);
+
+            EditorUtility.SetDirty(_dialogReference);
+            GraphChanged?.Invoke();
+        }
+        
+        private void OnAfterDomainReload()
+        {
+            if (_dialogReference != null)
+            {
+                // Force deserialization after domain reload
+                foreach (var variable in _dialogReference.variables)
+                {
+                    variable?.OnAfterDeserialize();
+                }
+        
+                // Refresh the blackboard
+                if (_blackboard is VariableBlackboard variableBlackboard)
+                {
+                    variableBlackboard.LoadVariables(_dialogReference.variables);
+                }
+            }
+        }
+        
         private GraphViewChange OnGraphViewChanged(GraphViewChange graphViewChange)
         {
             if (_dialogReference == null)
@@ -113,7 +191,6 @@ namespace ShadyMax.DialogSystem.Editor
                     if (outputNode?.userData is BaseNodeEditor fromNode &&
                         inputNode?.userData is BaseNodeEditor toNode)
                     {
-
                         Undo.RegisterCompleteObjectUndo(new Object[] { _dialogReference, fromNode }
                             , "Create Connection");
                         
@@ -163,11 +240,46 @@ namespace ShadyMax.DialogSystem.Editor
             Add(_blackboard);
         }
         
+        public void SaveVariables(List<BaseVariable> variables)
+        {
+            if (_dialogReference == null) return;
+
+            Undo.RegisterCompleteObjectUndo(_dialogReference, "Save Variables");
+            _dialogReference.variables = variables;
+            EditorUtility.SetDirty(_dialogReference);
+            GraphChanged?.Invoke();
+            AssetDatabase.SaveAssets();
+        }
+
+        public void OnVariableAdded(BaseVariable variable)
+        {
+            if (_dialogReference == null) return;
+
+            Undo.RegisterCompleteObjectUndo(_dialogReference, "Add Variable");
+            _dialogReference.variables.Add(variable);
+            _blackboard.AddVariableField(variable);
+            EditorUtility.SetDirty(_dialogReference);
+            GraphChanged?.Invoke();
+            AssetDatabase.SaveAssets();
+        }
+
+        public void OnVariableRemoved(string variableGuid)
+        {
+            if (_dialogReference == null) return;
+
+            Undo.RegisterCompleteObjectUndo(_dialogReference, "Remove Variable");
+            _dialogReference.variables.RemoveAll(v => v.guid == variableGuid);
+            EditorUtility.SetDirty(_dialogReference);
+            GraphChanged?.Invoke();
+            AssetDatabase.SaveAssets();
+        }
+        
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)
         {
             var compatiblePorts = new List<Port>();
+            var allPorts = ports.ToList();
 
-            ports.ForEach((port) =>
+            allPorts.ForEach((port) =>
             {
                 if (startPort == port)
                     return;
@@ -178,7 +290,22 @@ namespace ShadyMax.DialogSystem.Editor
                 if (startPort.direction == port.direction)
                     return;
 
-                compatiblePorts.Add(port);
+                bool isCompatible = true;
+                
+                if (startPort is CustomPort customStartPort)
+                {
+                    isCompatible = customStartPort.IsConnectionAllowed(port);
+                }
+
+                if (port is CustomPort customEndPort && isCompatible)
+                {
+                    isCompatible = customEndPort.IsConnectionAllowed(startPort);
+                }
+
+                if (isCompatible)
+                {
+                    compatiblePorts.Add(port);
+                }
             });
 
             return compatiblePorts;
@@ -191,6 +318,12 @@ namespace ShadyMax.DialogSystem.Editor
 
         public void CreateNode(Type type)
         {
+            if (type == typeof(BeginNodeEditor))
+            {
+                Debug.LogWarning("BeginNode cannot be created manually");
+                return;
+            }
+            
             if (!typeof(BaseNodeEditor).IsAssignableFrom(type))
                 return;
 
@@ -234,13 +367,25 @@ namespace ShadyMax.DialogSystem.Editor
             }
             return null;
         }
-
         
         public new void DeleteElements(IEnumerable<GraphElement> elements)
         {
             if (!elements.Any() || _dialogReference == null) return;
             
             var elementsToDelete = elements.ToList();
+            
+            // Filter out BeginNode from deletion
+            elementsToDelete = elementsToDelete.Where(element =>
+            {
+                if (element is Node node && node.userData is BeginNodeEditor)
+                {
+                    Debug.LogWarning("BeginNode cannot be deleted");
+                    return false;
+                }
+                return true;
+            }).ToList();
+
+            if (!elementsToDelete.Any()) return;
             
             var objectsToUndo = new List<Object> { _dialogReference };
             
@@ -316,6 +461,15 @@ namespace ShadyMax.DialogSystem.Editor
                 EditorUtility.SetDirty(_dialogReference);
             }
             
+            Debug.Log(edge);
+            Debug.Log(edge.output is CustomPort);
+            Debug.Log(edge.input is CustomPort);
+            
+            if (edge.output is CustomPort customOutput)
+                customOutput.TriggerPortDisconnect(edge);
+            if (edge.input is CustomPort customInput)
+                customInput.TriggerPortDisconnect(edge);
+            
             edge.input.Disconnect(edge);
             edge.output.Disconnect(edge);
 
@@ -340,7 +494,26 @@ namespace ShadyMax.DialogSystem.Editor
             ClearGraphView();
             _dialogReference = graph;
             
-            Debug.Log($"Loading DialogGraph with {graph.nodes.Count} nodes, {graph.edges.Count} edges");
+            // Load variables into blackboard
+            if (_blackboard is VariableBlackboard variableBlackboard)
+            {
+                variableBlackboard.LoadVariables(graph.variables);
+            }
+            
+            Debug.Log($"Loading DialogGraph with {graph.nodes.Count} nodes, {graph.edges.Count} edges, {graph.variables.Count} variables");
+            
+            var beginNode = graph.nodes.OfType<BeginNodeEditor>().FirstOrDefault();
+            if (beginNode == null)
+            {
+                beginNode = ScriptableObject.CreateInstance<BeginNodeEditor>();
+                beginNode.name = "Begin Node";
+                beginNode.Guid = System.Guid.NewGuid().ToString();
+                beginNode.Position = Vector2.zero;
+        
+                AssetDatabase.AddObjectToAsset(beginNode, graph);
+                graph.nodes.Insert(0, beginNode); // Add at beginning
+                EditorUtility.SetDirty(graph);
+            }
             
             foreach (var node in graph.nodes)
             {
@@ -361,12 +534,13 @@ namespace ShadyMax.DialogSystem.Editor
                 var toNodeView = GetNodeByGuid(edgeData.toNode);
 
                 if (fromNodeView == null || toNodeView == null) continue;
+                
+                Port outputPort = null;
+                Port inputPort = null;
 
                 // Find the ports using the stored port names
-                var outputPort = fromNodeView.outputContainer.Q<Port>(edgeData.fromPort) as Port ??
-                                 fromNodeView.outputContainer.Q<Port>(name: null)?.ElementAt(0) as Port;
-                var inputPort = toNodeView.inputContainer.Q<Port>(edgeData.toPort) as Port ??
-                                toNodeView.inputContainer.Q<Port>(name: null)?.ElementAt(0) as Port;
+                outputPort = fromNodeView.Query<Port>().Where(p => p.name == edgeData.fromPort).First();
+                inputPort = toNodeView.Query<Port>().Where(p => p.name == edgeData.toPort).First();
 
                 if (outputPort == null || inputPort == null) continue;
 
@@ -374,200 +548,6 @@ namespace ShadyMax.DialogSystem.Editor
                 var edge = outputPort.ConnectTo(inputPort);
                 AddElement(edge);
             }
-
-            /*if (graph != null && graph.startNode == null)
-            {
-                // Create begin node if it doesn't exist
-                BeginNode beginNode = ScriptableObject.CreateInstance<BeginNode>();
-                beginNode.guid = System.Guid.NewGuid().ToString();
-                beginNode.name = "Begin Node";
-    
-                AssetDatabase.AddObjectToAsset(beginNode, graph);
-                graph.startNode = beginNode;
-                graph.nodes.Add(beginNode);
-                EditorUtility.SetDirty(graph);
-                AssetDatabase.SaveAssets();
-            }
-            
-            var startNode = graph.startNode;
-            var beginNodeView = new BeginNodeView(startNode, this);
-            beginNodeView.userData = startNode;
-            AddElement(beginNodeView);
-            nodeViewMap[startNode.guid] = beginNodeView;
-
-            foreach (var node in graph.nodes)
-            {
-                if (node == null) continue;
-                
-                Node nodeView = null;
-                
-                if (node is SentenceNode sentenceNode)
-                {
-                    nodeView  = CreateSentenceNodeView(sentenceNode);
-                }
-                else if (node is AnswerNode answerNode)
-                {
-                    nodeView  = CreateAnswerNodeView(answerNode);
-                } else if (node is IfNode ifNode)
-                {
-                    nodeView  = CreateIfNodeView(ifNode);
-                } else if (node is SimpleVariableMathNode simpleVariableMathNode)
-                {
-                    if (simpleVariableMathNode.mathType == SimpleMathType.Set)
-                        nodeView = CreateSetVariableNodeView(simpleVariableMathNode);
-                    if (simpleVariableMathNode.mathType == SimpleMathType.Add)
-                        nodeView = CreateAddVariableNodeView(simpleVariableMathNode);
-                    if (simpleVariableMathNode.mathType == SimpleMathType.Subtract)
-                        nodeView = CreateSubtractVariableNodeView(simpleVariableMathNode);
-                    if (simpleVariableMathNode.mathType == SimpleMathType.Multiply)
-                        nodeView = CreateMultiplyVariableNodeView(simpleVariableMathNode);
-                    if (simpleVariableMathNode.mathType == SimpleMathType.Divide)
-                        nodeView = CreateDivideVariableNodeView(simpleVariableMathNode);
-                }
-
-                if (nodeView  != null)
-                {
-                    nodeView .userData = node;
-                    AddElement(nodeView );
-                    if (node is BaseNode baseNode &&
-                        !string.IsNullOrEmpty(baseNode.guid))
-                        nodeViewMap[baseNode.guid] = nodeView ;
-                }
-            }
-            
-            string beginNextGuid = graph.startNode.nextNodeGuid;
-
-            if (!string.IsNullOrEmpty(beginNextGuid) &&
-                nodeViewMap.ContainsKey(graph.startNode.guid) &&
-                nodeViewMap.TryGetValue(beginNextGuid, out var to))
-            {   
-                var from = nodeViewMap[graph.startNode.guid] as BeginNodeView;
-                if (from != null && to != null)
-                {
-                    var input = GetInputPort(to);
-                    if (input != null)
-                    {
-                        var edge = from.outputPort.ConnectTo(input);
-                        AddElement(edge);
-                    }
-                }
-            }
-            
-            
-            foreach (var nodeView in graph.nodes)
-            {
-                if (nodeView is SentenceNode sentenceNode)
-                {
-                    string nextGuid = sentenceNode.nextNodeGuid;
-
-                    if (!string.IsNullOrEmpty(nextGuid) && 
-                        nodeViewMap.ContainsKey(sentenceNode.guid) && 
-                        nodeViewMap.ContainsKey(nextGuid))
-
-                    {
-                        var fromView = nodeViewMap[sentenceNode.GUID] as SentenceNodeView;
-                        var toView = nodeViewMap[nextGuid];
-
-                        if (fromView != null &&
-                            toView != null)
-                        {
-                            var input = GetInputPort(toView);
-                            if (input != null)
-                            {
-                                var edge = fromView.outputPort.ConnectTo(input);
-                                AddElement(edge);
-                            }
-                        }
-                    }
-                }
-                else if (nodeView is AnswerNode answerNode)
-                {
-                    var fromView = nodeViewMap.GetValueOrDefault(answerNode.guid) as AnswerNodeView;
-                    if (fromView == null) continue;
-                    
-                    if (!string.IsNullOrEmpty(answerNode.elseNextNodeGuid))
-                    {
-                        if (nodeViewMap.TryGetValue(answerNode.elseNextNodeGuid, out var toView))
-                        {
-                            var input = GetInputPort(toView);
-                            if (input != null)
-                            {
-                                var edge = fromView.elsePort.ConnectTo(input);
-                                AddElement(edge);
-                            }
-                        }
-                    }
-
-
-                    for (int i = 0; i < answerNode.answersCount; i++)
-                    {
-                        var nextGuid = answerNode.answers[i].nextNodeGuid;
-                        if (string.IsNullOrEmpty(nextGuid)) continue;
-
-                        if (nodeViewMap.TryGetValue(nextGuid, out var toView ))
-                        {
-                            var input = GetInputPort(toView);
-                            if (input != null && i < fromView.outputPorts.Count)
-                            {
-                                var edge = fromView.outputPorts[i].ConnectTo(input);
-                                AddElement(edge);
-
-                            }
-                        }
-                    }
-                } else if (nodeView is IfNode ifNode)
-                {
-                    string trueNextGuid = ifNode.trueNodeGuid;
-                    string falseNextGuid = ifNode.falseNodeGuid;
-
-                    if (!string.IsNullOrEmpty(trueNextGuid) &&
-                        nodeViewMap.TryGetValue(ifNode.guid, out var fromTrueView) &&
-                        nodeViewMap.TryGetValue(trueNextGuid, out var toTrueView))
-                    {
-                        var input = GetInputPort(toTrueView);
-                        if (input != null)
-                        {
-                            var edge = (fromTrueView as IfNodeView).truePort.ConnectTo(input);
-                            AddElement(edge);
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(falseNextGuid) &&
-                        nodeViewMap.TryGetValue(ifNode.guid, out var fromFalseView) &&
-                        nodeViewMap.TryGetValue(falseNextGuid, out var toFalseView))
-                    {
-                        var input = GetInputPort(toFalseView);
-                        if (input != null)
-                        {
-                            var edge = (fromFalseView as IfNodeView).falsePort.ConnectTo(input);
-                            AddElement(edge);
-                        }
-                    }
-                } else if (nodeView is SimpleVariableMathNode simpleVariableMathNode)
-                {
-                    string nextGuid = simpleVariableMathNode.nextNodeGuid;
-
-                    if (!string.IsNullOrEmpty(nextGuid) &&
-                        nodeViewMap.TryGetValue(simpleVariableMathNode.guid, out var fromTrueView) &&
-                        nodeViewMap.TryGetValue(nextGuid, out var toTrueView))
-                    {
-                        var input = GetInputPort(toTrueView);
-                        if (input != null)
-                        {
-                            var edge = (fromTrueView switch
-                            {
-                                SetVariableNodeView setVariableNodeView => setVariableNodeView.outputPort,
-                                AddVariableNodeView addVariableNodeView => addVariableNodeView.outputPort,
-                                SubtractVariableNodeView subtractVariableNodeView => subtractVariableNodeView.outputPort,
-                                MultiplyVariableNodeView multiplyVariableNodeView => multiplyVariableNodeView.outputPort,
-                                DivideVariableNodeView divideVariableNodeView => divideVariableNodeView.outputPort,
-                                _ => null
-                            }).ConnectTo(input);
-                            AddElement(edge);
-                        }
-                    }
-                }
-            }*/
         }
         
         public void UnloadGraph()
@@ -601,6 +581,7 @@ namespace ShadyMax.DialogSystem.Editor
         {
             UnloadGraph();
             Undo.undoRedoPerformed -= OnUndoRedo;
+            AssemblyReloadEvents.afterAssemblyReload -= OnAfterDomainReload;
         }
         
         private void OnUndoRedo()

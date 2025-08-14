@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using ShadyMax.DialogSystem.Editor.Variables;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -10,10 +11,12 @@ namespace ShadyMax.DialogSystem.Editor
     public class VariableSearchWindow: ScriptableObject, ISearchWindowProvider
     {
         private Blackboard _blackboard;
+        private DialogGraphView _graphView;
 
-        public void Initialize(Blackboard blackboard)
+        public void Initialize(Blackboard blackboard, DialogGraphView graphView)
         {
             _blackboard = blackboard;
+            _graphView = graphView;
         }
         
         public List<SearchTreeEntry> CreateSearchTree(SearchWindowContext context)
@@ -21,32 +24,35 @@ namespace ShadyMax.DialogSystem.Editor
             var tree = new List<SearchTreeEntry>()
             {
                 new SearchTreeGroupEntry(new GUIContent("Variables"), 0),
-                new SearchTreeEntry(new GUIContent("Int")) {level = 1, userData = new BlackboardVariable(Guid.NewGuid().ToString(),"int","0")},
-                new SearchTreeEntry(new GUIContent("Float")) {level = 1, userData = new BlackboardVariable(Guid.NewGuid().ToString(),"float","0.0")},
-                new SearchTreeEntry(new GUIContent("Bool")) {level = 1, userData = new BlackboardVariable(Guid.NewGuid().ToString(),"bool","false")},
-                new SearchTreeEntry(new GUIContent("String")) {level = 1, userData = new BlackboardVariable(Guid.NewGuid().ToString(),"string","")},
+                new SearchTreeEntry(new GUIContent("Int")) {level = 1, userData = "int"},
+                new SearchTreeEntry(new GUIContent("Float")) {level = 1, userData = "float"},
+                new SearchTreeEntry(new GUIContent("Bool")) {level = 1, userData = "bool"},
+                new SearchTreeEntry(new GUIContent("String")) {level = 1, userData = "string"},
             };
             return tree;
         }
 
         public bool OnSelectEntry(SearchTreeEntry searchTreeEntry, SearchWindowContext context)
         {
-            if (searchTreeEntry.userData is BlackboardVariable variable)
+            var variableType = searchTreeEntry.userData as string;
+            if (string.IsNullOrEmpty(variableType)) return false;
+
+            var guid = Guid.NewGuid().ToString();
+            BaseVariable variable = variableType switch
             {
-                var field = new BlackboardField(){text = variable.name, typeText = variable.type};
-                //TODO: make it read data
-                var row = variable.type switch
-                {
-                    "int" => new BlackboardRow(field, new IntegerField("value") { value = int.Parse(variable.value) }),
-                    "float" => new BlackboardRow(field,
-                        new FloatField("value") { value = float.Parse(variable.value, NumberStyles.Float, CultureInfo.InvariantCulture) }),
-                    "bool" => new BlackboardRow(field, new Toggle("value") { value = bool.Parse(variable.value) }),
-                    "string" => new BlackboardRow(field, new TextField("value") { value = variable.value }),
-                    _ => new BlackboardRow(field, new Label("Invalid type"))
-                };
-                _blackboard.Add(row);
+                "int" => new IntVariable(Guid.NewGuid().ToString(), "int", 0) { guid = guid },
+                "float" => new FloatVariable(Guid.NewGuid().ToString(), "float", 0.0f) { guid = guid },
+                "bool" => new BoolVariable(Guid.NewGuid().ToString(), "bool", false) { guid = guid },
+                "string" => new StringVariable(Guid.NewGuid().ToString(), "string", "") { guid = guid },
+                _ => new BaseVariable(Guid.NewGuid().ToString(), "Invalid type", "") { guid = guid }
+            };
+
+            if (variable != null)
+            {
+                _graphView.OnVariableAdded(variable);
                 return true;
             }
+
             return false;
         }
     }

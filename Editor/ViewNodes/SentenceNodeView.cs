@@ -22,7 +22,8 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
 
         protected override void CreateInputPorts()
         {
-            inputContainer.Clear();
+            if (inputPort != null) 
+                return;
             
             inputPort = InstantiatePort(Orientation.Horizontal, Direction.Input, Port.Capacity.Multi, typeof(BaseNodeEditor));
             inputPort.portName = "In";
@@ -32,7 +33,8 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
 
         protected override void CreateOutputPorts()
         {
-            outputContainer.Clear();
+            if (outputPort != null)
+                return;
             
             outputPort = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Single, typeof(BaseNodeEditor));
             outputPort.portName = "Out";

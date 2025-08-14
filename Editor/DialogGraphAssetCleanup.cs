@@ -94,23 +94,58 @@ namespace ShadyMax.DialogSystem.Editor
 
         private static void RemoveCollectionByName(string tableName)
         {
-            var collection = LocalizationEditorSettings.GetStringTableCollection(tableName);
-
-            // Reflection path (if a future version exposes RemoveCollection)
-            if (collection != null && TryRemoveCollectionViaReflection(collection))
-                return;
-
-            // Manual deletion path
-            if (collection == null)
+            // Remove string table collection
+            var stringCollection = LocalizationEditorSettings.GetStringTableCollection(tableName);
+            if (stringCollection != null)
             {
-                // Try to find by scanning assets if lookup failed
-                collection = FindCollectionByName(tableName);
+                if (TryRemoveCollectionViaReflection(stringCollection))
+                {
+                    // Also remove corresponding audio collection
+                    RemoveAudioCollectionByName(tableName);
+                    return;
+                }
+                RemoveCollectionManually(stringCollection);
             }
 
-            if (collection == null)
-                return;
-
-            RemoveCollectionManually(collection);
+            // Remove corresponding audio table collection
+            RemoveAudioCollectionByName(tableName);
+        }
+        
+        private static void RemoveAudioCollectionByName(string tableName)
+        {
+            string audioTableName = tableName + "_Audio";
+            var audioCollection = LocalizationEditorSettings.GetAssetTableCollection(audioTableName);
+            if (audioCollection != null)
+            {
+                if (!TryRemoveAudioCollectionViaReflection(audioCollection))
+                {
+                    RemoveAudioCollectionManually(audioCollection);
+                }
+            }
+        }
+        
+        private static bool TryRemoveAudioCollectionViaReflection(AssetTableCollection collection)
+        {
+            try
+            {
+                var mi = typeof(LocalizationEditorSettings).GetMethod(
+                    "RemoveCollection",
+                    BindingFlags.Public | BindingFlags.Static,
+                    binder: null,
+                    types: new[] { typeof(AssetTableCollection) },
+                    modifiers: null);
+                if (mi != null)
+                {
+                    mi.Invoke(null, new object[] { collection });
+                    AssetDatabase.SaveAssets();
+                    return true;
+                }
+            }
+            catch
+            {
+                // ignore and fallback
+            }
+            return false;
         }
 
         private static bool TryRemoveCollectionViaReflection(StringTableCollection collection)
@@ -199,6 +234,55 @@ namespace ShadyMax.DialogSystem.Editor
                 AssetDatabase.SaveAssets();
             }
         }
+        
+        public static void RemoveAudioCollectionManually(AssetTableCollection collection)
+        {
+            var toDelete = new List<string>();
+
+            // Collect per-locale table asset paths
+            foreach (var tableRef in collection.Tables.Where(t => t.asset != null))
+            {
+                var table = tableRef.asset;
+                var path = AssetDatabase.GetAssetPath(table);
+                if (!string.IsNullOrEmpty(path))
+                    toDelete.Add(path);
+            }
+
+            // Shared data
+            var sharedPath = AssetDatabase.GetAssetPath(collection.SharedData);
+            if (!string.IsNullOrEmpty(sharedPath))
+                toDelete.Add(sharedPath);
+
+            // Collection asset itself
+            var collectionPath = AssetDatabase.GetAssetPath(collection);
+            if (!string.IsNullOrEmpty(collectionPath))
+                toDelete.Add(collectionPath);
+
+            // Delete assets
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                foreach (var path in toDelete.Distinct())
+                {
+                    if (string.IsNullOrEmpty(path)) continue;
+
+                    var ok = AssetDatabase.DeleteAsset(path);
+                    if (!ok)
+                    {
+                        AssetDatabase.ImportAsset(path);
+                        ok = AssetDatabase.DeleteAsset(path);
+                        if (!ok)
+                            Debug.LogWarning($"Audio localization cleanup: could not delete asset at '{path}'.");
+                    }
+                }
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+                AssetDatabase.Refresh();
+                AssetDatabase.SaveAssets();
+            }
+        }
     }
 
     // Optional utility: run manually to clean up any orphans left behind
@@ -234,6 +318,40 @@ namespace ShadyMax.DialogSystem.Editor
             }
 
             Debug.Log("Localization cleanup complete.");
+        }
+        
+        [MenuItem("Tools/Localization/Clean Orphaned Audio Table Collections")]
+        private static void CleanAudioOrphans()
+        {
+            var audioCollections = AssetDatabase.FindAssets($"t:{nameof(AssetTableCollection)}")
+                .Select(g => AssetDatabase.LoadAssetAtPath<AssetTableCollection>(AssetDatabase.GUIDToAssetPath(g)))
+                .Where(c => c != null)
+                .ToList();
+
+            var referenced = new HashSet<string>(StringComparer.Ordinal);
+            var allObjs = AssetDatabase.FindAssets("t:ScriptableObject");
+            foreach (var guid in allObjs)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var obj = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
+                if (obj == null) continue;
+
+                var field = obj.GetType().GetField("localizationTable", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                var name = field?.GetValue(obj) as string;
+                if (!string.IsNullOrEmpty(name))
+                {
+                    referenced.Add(name);
+                    referenced.Add(name + "_Audio");
+                }
+            }
+
+            foreach (var c in audioCollections)
+            {
+                if (!referenced.Contains(c.TableCollectionName))
+                    DialogGraphLocalizationPostDelete.RemoveAudioCollectionManually(c);
+            }
+
+            Debug.Log("Audio localization cleanup complete.");
         }
     }
 

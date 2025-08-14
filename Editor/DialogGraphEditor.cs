@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using ShadyMax.DialogSystem.Editor.Nodes;
+using ShadyMax.DialogSystem.Editor.Variables;
 using UnityEditor;
 using UnityEditor.Localization;
 using UnityEngine;
@@ -13,7 +14,9 @@ namespace ShadyMax.DialogSystem.Editor
     {
         public List<BaseNodeEditor> nodes = new List<BaseNodeEditor>();
         public List<EdgeData> edges = new List<EdgeData>();
+        public List<BaseVariable> variables = new List<BaseVariable>();
         public string localizationTable = "";
+        public string AudioTableReference => localizationTable + "_Audio";
         
         private void OnEnable()
         {
@@ -21,22 +24,55 @@ namespace ShadyMax.DialogSystem.Editor
             {
                 // Generate a unique table name based on the asset name
                 localizationTable = Guid.NewGuid().ToString();
-                
-                // Check if the table already exists
-                var tableCollection = LocalizationEditorSettings.GetStringTableCollection(localizationTable);
-                
-                if (tableCollection == null)
+
+                // Check if the string table already exists
+                var stringTableCollection = LocalizationEditorSettings.GetStringTableCollection(localizationTable);
+
+                if (stringTableCollection == null)
                 {
-                    // Create new table collection if it doesn't exist
-                    tableCollection = LocalizationEditorSettings.CreateStringTableCollection(
+                    // Create new string table collection if it doesn't exist
+                    stringTableCollection = LocalizationEditorSettings.CreateStringTableCollection(
                         localizationTable,
                         "Assets/Localization/Tables"
-                        );
+                    );
                 }
+                
+                // Check if the audio table already exists
+                var audioTableCollection = LocalizationEditorSettings.GetAssetTableCollection(AudioTableReference);
+
+                if (audioTableCollection == null)
+                {
+                    // Create new audio table collection if it doesn't exist
+                    audioTableCollection = LocalizationEditorSettings.CreateAssetTableCollection(
+                        AudioTableReference,
+                        "Assets/Localization/Tables"
+                    );
+                }
+                
+                var locales = LocalizationEditorSettings.GetLocales();
+                foreach (var locale in locales)
+                {
+                    // Create string table for this locale if it doesn't exist
+                    if (stringTableCollection.GetTable(locale.Identifier) == null)
+                    {
+                        stringTableCollection.AddNewTable(locale.Identifier);
+                    }
+
+                    // Create asset table for this locale if it doesn't exist
+                    if (audioTableCollection.GetTable(locale.Identifier) == null)
+                    {
+                        audioTableCollection.AddNewTable(locale.Identifier);
+                    }
+                }
+                
+                EditorUtility.SetDirty(stringTableCollection);
+                EditorUtility.SetDirty(audioTableCollection);
+                AssetDatabase.SaveAssets();
             }
             
             nodes ??= new List<BaseNodeEditor>();
             edges ??= new List<EdgeData>();
+            variables ??= new List<BaseVariable>();
 
             var removed = RemoveInvalidEdges(autoSave: true);
             if (removed > 0)

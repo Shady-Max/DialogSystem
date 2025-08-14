@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
@@ -14,8 +15,10 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
     public class SentenceNodeInspector : BaseNodeInspector<SentenceNodeEditor>
     {
         private LocalizationTableCollection _tableCollection;
+        private LocalizationTableCollection _audioTableCollection;
         private List<Locale> _availableLocales;
         private Dictionary<Locale, string> _localizedValues = new Dictionary<Locale, string>();
+        private Dictionary<Locale, AudioClip> _localizedAudioClips = new Dictionary<Locale, AudioClip>();
         private Vector2 _scrollPosition;
         private bool _needsSave = false;
 
@@ -34,28 +37,132 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
                 return;
             }
 
-            // Get the table collection
-            _tableCollection = LocalizationEditorSettings.GetStringTableCollection(_target.tableReference);
-            
-            if (_tableCollection == null)
+            try
             {
-                Debug.LogError("Could not find table collection!");
+
+                // Get the table collection
+                _tableCollection = LocalizationEditorSettings.GetStringTableCollection(_target.tableReference);
+
+                if (!string.IsNullOrEmpty(_target.AudioTableReference))
+                {
+                    _audioTableCollection =
+                        LocalizationEditorSettings.GetAssetTableCollection(_target.AudioTableReference);
+                }
+                else
+                {
+                    _audioTableCollection = null;
+                }
+
+                if (_tableCollection == null)
+                {
+                    Debug.LogError("Could not find table collection!");
+                    return;
+                }
+
+
+                // Get all available locales
+                _availableLocales = LocalizationEditorSettings.GetLocales().ToList();
+
+                // Load current values for each locale
+                _localizedValues.Clear();
+                _localizedAudioClips.Clear();
+                foreach (var locale in _availableLocales)
+                {
+                    var stringTable = _tableCollection.GetTable(locale.Identifier) as StringTable;
+                    if (stringTable != null)
+                    {
+                        _localizedValues[locale] = stringTable.GetEntry(_target.Guid)?.Value ?? string.Empty;
+                    }
+
+                    if (_audioTableCollection != null)
+                    {
+                        var assetTable = _audioTableCollection.GetTable(locale.Identifier) as AssetTable;
+                        if (assetTable != null)
+                        {
+                            var audioEntry = assetTable.GetEntry(_target.Guid);
+                            if (audioEntry != null && !string.IsNullOrEmpty(audioEntry.Guid))
+                            {
+                                string assetPath = AssetDatabase.GUIDToAssetPath(audioEntry.Guid);
+                                if (!string.IsNullOrEmpty(assetPath))
+                                {
+                                    _localizedAudioClips[locale] = AssetDatabase.LoadAssetAtPath<AudioClip>(assetPath);
+                                }
+                            }
+                        }
+
+                        // Initialize with null if no clip found
+                        if (!_localizedAudioClips.ContainsKey(locale))
+                        {
+                            _localizedAudioClips[locale] = null;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error refreshing localization data: {ex.Message}");
+                _tableCollection = null;
+                _audioTableCollection = null;
+                _availableLocales = new List<Locale>();
+                _localizedValues.Clear();
+                _localizedAudioClips.Clear();
+            }
+        }
+        
+        private void UpdateAudioClip(Locale locale, string key, AudioClip newClip)
+        {
+            if (_audioTableCollection == null || string.IsNullOrEmpty(key))
+            {
+                Debug.LogError("Audio table collection is null or key is empty!");
                 return;
             }
 
-
-            // Get all available locales
-            _availableLocales = LocalizationEditorSettings.GetLocales().ToList();
-            
-            // Load current values for each locale
-            _localizedValues.Clear();
-            foreach (var locale in _availableLocales)
+            AssetTable table = _audioTableCollection.GetTable(locale.Identifier) as AssetTable;
+            if (table == null)
             {
-                var table = _tableCollection.GetTable(locale.Identifier) as StringTable;
-                if (table != null)
+                table = _audioTableCollection.AddNewTable(locale.Identifier) as AssetTable;
+                if (table == null)
                 {
-                    _localizedValues[locale] = table.GetEntry(_target.Guid)?.Value ?? string.Empty;
+                    Debug.LogError($"Failed to create audio table for locale {locale.Identifier}");
+                    return;
                 }
+            }
+            
+            Undo.RecordObject(table, "Update Audio Clip");
+            Undo.RecordObject(table.SharedData, "Update Shared Data");
+            
+            // Get or create shared table entry
+            SharedTableData.SharedTableEntry sharedEntry;
+            if (!table.SharedData.Contains(key))
+            {
+                sharedEntry = table.SharedData.AddKey(key);
+            }
+            else
+            {
+                sharedEntry = table.SharedData.GetEntry(key);
+            }
+
+            if (sharedEntry != null)
+            {
+                // Get the asset GUID
+                string assetGuid = newClip != null ? AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(newClip)) : string.Empty;
+                
+                // Update or create the localized audio clip
+                var entry = table.GetEntry(sharedEntry.Id);
+                if (entry == null)
+                {
+                    entry = table.AddEntry(sharedEntry.Id, assetGuid);
+                }
+                else
+                {
+                    entry.Guid = assetGuid;
+                }
+
+                EditorUtility.SetDirty(table);
+                EditorUtility.SetDirty(table.SharedData);
+                EditorUtility.SetDirty(_audioTableCollection);
+
+                _needsSave = true;
             }
         }
         
@@ -154,24 +261,46 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
             {
                 using (new EditorGUI.IndentLevelScope())
                 {
+                    if (_audioTableCollection == null)
+                    {
+                        EditorGUILayout.HelpBox($"Audio table '{_target.AudioTableReference}' not found. Create an Audio Table Collection with this name to enable audio localization.", 
+                            MessageType.Warning);
+                    }
+
                     _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition, GUILayout.ExpandHeight(true), GUILayout.MinHeight(20), GUILayout.MaxHeight(200));
 
                     foreach (var locale in _availableLocales)
                     {
+                        EditorGUILayout.BeginVertical("box");
+                        EditorGUILayout.LabelField(locale.name, EditorStyles.boldLabel);
+                        
                         string currentValue = _localizedValues.ContainsKey(locale) ? _localizedValues[locale] : string.Empty;
-
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField(locale.name, GUILayout.Width(100));
                         
                         EditorGUI.BeginChangeCheck();
-                        string newValue = EditorGUILayout.TextField(currentValue);
+                        string newValue = EditorGUILayout.TextField("Text:",currentValue);
                         if (EditorGUI.EndChangeCheck())
                         {
                             UpdateTranslation(locale, _target.Guid, newValue);
                             _localizedValues[locale] = newValue;
                         }
-                        
-                        EditorGUILayout.EndHorizontal();
+
+                        if (_audioTableCollection != null)
+                        {
+                            AudioClip currentClip = _localizedAudioClips.ContainsKey(locale)
+                                ? _localizedAudioClips[locale]
+                                : null;
+                            EditorGUI.BeginChangeCheck();
+                            AudioClip newClip =
+                                EditorGUILayout.ObjectField("Audio:", currentClip, typeof(AudioClip), false) as
+                                    AudioClip;
+                            if (EditorGUI.EndChangeCheck())
+                            {
+                                UpdateAudioClip(locale, _target.Guid, newClip);
+                                _localizedAudioClips[locale] = newClip;
+                            }
+                        }
+
+                        EditorGUILayout.EndVertical();
                         EditorGUILayout.Space(5);
                     }
 

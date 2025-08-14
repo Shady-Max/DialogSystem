@@ -9,6 +9,8 @@ namespace ShadyMax.DialogSystem.Editor.Nodes
         [SerializeField] private Vector2 _position;
         
         public string tableReference;
+        public string AudioTableReference => tableReference + "_Audio";
+
         public System.Action OnDataChanged;
 
         
