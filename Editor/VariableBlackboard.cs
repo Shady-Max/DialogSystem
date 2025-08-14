@@ -25,7 +25,6 @@ namespace ShadyMax.DialogSystem.Editor
             foreach (var variable in variablesCopy)
             {
                 variable.OnAfterDeserialize();
-                Debug.Log($"Loading variable: {variable.name}, type: {variable.type}, value: {variable.stringValue}");
                 AddVariableField(variable);
             }
         }
@@ -114,11 +113,9 @@ namespace ShadyMax.DialogSystem.Editor
         
         private IntegerField CreateIntField(IntVariable intVar)
         {
-            Debug.Log($"Creating int field for {intVar?.name}, value: {intVar?.value}");
             var field = new IntegerField("value") { value = intVar?.value ?? 0 };
             field.RegisterValueChangedCallback(evt =>
-            {
-                Debug.Log($"Int field value changed for {intVar?.name}: {evt.newValue}");
+            { 
                 if (intVar != null)
                 {
                     intVar.value = evt.newValue;
@@ -131,11 +128,9 @@ namespace ShadyMax.DialogSystem.Editor
         
         private FloatField CreateFloatField(FloatVariable floatVar)
         {
-            Debug.Log($"Creating float field for {floatVar?.name}, value: {floatVar?.value}");
             var field = new FloatField("value") { value = floatVar?.value ?? 0.0f };
             field.RegisterValueChangedCallback(evt =>
             {
-                Debug.Log($"Float field value changed: {evt.newValue}");
                 if (floatVar != null)
                 {
                     floatVar.value = evt.newValue;
@@ -148,11 +143,9 @@ namespace ShadyMax.DialogSystem.Editor
         
         private Toggle CreateBoolField(BoolVariable boolVar)
         {
-            Debug.Log($"Creating bool field for {boolVar?.name}, value: {boolVar?.value}");
             var field = new Toggle("value") { value = boolVar?.value ?? false };
             field.RegisterValueChangedCallback(evt =>
             {
-                Debug.Log($"Bool field value changed: {evt.newValue}");
                 if (boolVar != null)
                 {
                     boolVar.value = evt.newValue;
@@ -165,11 +158,9 @@ namespace ShadyMax.DialogSystem.Editor
         
         private TextField CreateStringField(StringVariable stringVar)
         {
-            Debug.Log($"Creating string field for {stringVar?.name}, value: {stringVar?.value}");
             var field = new TextField("value") { value = stringVar?.value ?? "" };
             field.RegisterValueChangedCallback(evt =>
             {
-                Debug.Log($"String field value changed: {evt.newValue}");
                 if (stringVar != null)
                 {
                     stringVar.value = evt.newValue;

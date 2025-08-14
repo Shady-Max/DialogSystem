@@ -73,7 +73,6 @@ namespace ShadyMax.DialogSystem.Editor
         {
             if (typeof(T) == typeof(bool))
             {
-                Debug.Log("bool");
                 _colors.Add(new Color(255/255f, 197/255f, 0/255f, 1f));
             }
             else if (typeof(T) == typeof(string))

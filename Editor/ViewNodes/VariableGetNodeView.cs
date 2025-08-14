@@ -12,7 +12,7 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
     {
         public CustomPort outputPort;
         private Label variableNameLabel;
-        private VisualElement mainContainer;
+        private new VisualElement mainContainer;
         private bool isSelected = false;
         protected override string GetTitle() => "";
 

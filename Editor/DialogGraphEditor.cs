@@ -117,14 +117,11 @@ namespace ShadyMax.DialogSystem.Editor
             // Reflect over EdgeData to find any BaseNodeEditor references.
             // If any referenced node is null or not part of this graph, the edge is invalid.
             var fields = edge.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-            bool foundNodeRef = false;
-
+            
             foreach (var field in fields)
             {
                 if (typeof(BaseNodeEditor).IsAssignableFrom(field.FieldType))
                 {
-                    foundNodeRef = true;
                     var node = field.GetValue(edge) as BaseNodeEditor;
 
                     if (node == null)
