@@ -29,27 +29,27 @@ namespace ShadyMax.DialogSystem.Editor
                  new SearchTreeEntry(new GUIContent("Answer Node")) {level = 2, userData = typeof(AnswerNodeEditor)},
                  
                  new SearchTreeGroupEntry(new GUIContent("Logic"), 1),
-                 /*new SearchTreeEntry(new GUIContent("And")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Or")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Not")) {level = 2, userData = typeof(BaseNodeEditor)},*/
+                 new SearchTreeEntry(new GUIContent("And")) {level = 2, userData = typeof(AndNodeEditor)},
+                 new SearchTreeEntry(new GUIContent("Or")) {level = 2, userData = typeof(OrNodeEditor)},
+                 new SearchTreeEntry(new GUIContent("Not")) {level = 2, userData = typeof(NotNodeEditor)},
                  new SearchTreeEntry(new GUIContent("If")) {level = 2, userData = typeof(IfNodeEditor)},
                  
                  new SearchTreeGroupEntry(new GUIContent("Math"), 1),
-                 /*new SearchTreeEntry(new GUIContent("Add")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Subtract")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Multiply")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Divide")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Set")) {level = 2, userData = typeof(BaseNodeEditor)},*/
+                 //new SearchTreeEntry(new GUIContent("Add")) {level = 2, userData = typeof(AddNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Subtract")) {level = 2, userData = typeof(SubtractNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Multiply")) {level = 2, userData = typeof(MultiplyNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Divide")) {level = 2, userData = typeof(DivideNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Set")) {level = 2, userData = typeof(SetNodeEditor)},
                  
                  new SearchTreeGroupEntry(new GUIContent("Value"), 1),
-                 /*new SearchTreeEntry(new GUIContent("Float")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Int")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("String")) {level = 2, userData = typeof(BaseNodeEditor)},
-                 new SearchTreeEntry(new GUIContent("Bool")) {level = 2, userData = typeof(BaseNodeEditor)},*/
+                 //new SearchTreeEntry(new GUIContent("Float")) {level = 2, userData = typeof(FloatNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Int")) {level = 2, userData = typeof(IntNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("String")) {level = 2, userData = typeof(StringNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Bool")) {level = 2, userData = typeof(BoolNodeEditor)},
                  
                  new SearchTreeGroupEntry(new GUIContent("Variables"), 1),
                  /*
-                  new SearchTreeEntry(new GUIContent("Set")) {level = 2, userData = typeof(BaseNodeEditor)},
+                  new SearchTreeEntry(new GUIContent("Set Variable")) {level = 2, userData = typeof(BaseNodeEditor)},
                   */
             };
 
