@@ -134,7 +134,7 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
                     variableNames.Add("---");
                 }
 
-                int currentIndex = string.IsNullOrEmpty(node.variableGuid) ? 0 : GraphView.DialogReference.variables.FindIndex(v => v.guid == node.variableGuid); ;
+                int currentIndex = string.IsNullOrEmpty(node.variableGuid) ? 0 : GraphView.DialogReference.variables.FindIndex(v => v.guid == node.variableGuid);
                 
                 DropdownField dropdownVariable = new DropdownField("Variable", variableNames, currentIndex);
                 if (node.variableGuid == string.Empty && variableNames.Count > 0)

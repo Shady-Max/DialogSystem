@@ -48,9 +48,11 @@ namespace ShadyMax.DialogSystem.Editor
                  //new SearchTreeEntry(new GUIContent("Bool")) {level = 2, userData = typeof(BoolNodeEditor)},
                  
                  new SearchTreeGroupEntry(new GUIContent("Variables"), 1),
-                 /*
-                  new SearchTreeEntry(new GUIContent("Set Variable")) {level = 2, userData = typeof(BaseNodeEditor)},
-                  */
+                 new SearchTreeEntry(new GUIContent("Set Variable")) {level = 2, userData = typeof(VariableSetNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Add To Variable")) {level = 2, userData = typeof(VariableAddNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Subtract From Variable")) {level = 2, userData = typeof(VariableSubtractNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Multiply Variable by")) {level = 2, userData = typeof(VariableMultiplyNodeEditor)},
+                 //new SearchTreeEntry(new GUIContent("Divide Variable by")) {level = 2, userData = typeof(VariableDivideBaseNodeEditor)},
             };
 
             foreach (var variable in _graphView.DialogReference.variables)

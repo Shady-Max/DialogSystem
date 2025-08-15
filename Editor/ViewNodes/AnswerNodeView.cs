@@ -8,12 +8,14 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
     public class AnswerNodeView : BaseNodeView<AnswerNodeEditor>
     {
         public Port inputPort;
+        public List<CustomPort> conditionPorts = new List<CustomPort>();
         public List<Port> outputPorts = new List<Port>();
         public Port elsePort;
         
         private const string InKey = "In";
         private const string ElseKey = "Else Out";
         
+        private readonly Dictionary<string, CustomPort> _conditionByKey = new Dictionary<string, CustomPort>();
         private readonly Dictionary<string, Port> _outputsByKey = new Dictionary<string, Port>();
         
         private bool _initialized;
@@ -28,6 +30,8 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
             inputPort.portName = InKey;
             inputPort.name = InKey;
             inputContainer.Add(inputPort);
+            
+            EnsureConditionPortsCount(node.answerCount);
         }
 
         protected override void CreateOutputPorts()
@@ -61,7 +65,8 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
             }
             else
             {
-                // Only reconcile outputs; do not recreate inputs/else
+                GraphView.GraphChanged?.Invoke();
+                EnsureConditionPortsCount(node.answerCount);
                 EnsureAnswerPortsCount(node.answerCount);
             }
 
@@ -82,7 +87,7 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
             // Add missing ports
             for (int i = currentCount; i < desiredCount; i++)
             {
-                var label = AnswerLabel(i);
+                var label = $"Answer {i + 1}";
                 var p = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Single, typeof(BaseNodeEditor));
                 p.portName = label;
                 p.name = label;
@@ -109,6 +114,44 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
                 outputContainer.Remove(p);
             }
         }
+        
+        private void EnsureConditionPortsCount(int desiredCount)
+        {
+            // Current answer ports are everything except elsePort (which is the first we added)
+            // We keep them in outputPorts after elsePort.
+            // Count how many "answer" ports we currently have:
+            int currentCount = conditionPorts.Count; // excluding elsePort
+
+            // Add missing ports
+            for (int i = currentCount; i < desiredCount; i++)
+            {
+                var label = $"Condition {i + 1}";
+                var p = CustomPort.Create<Edge>(Orientation.Horizontal, Direction.Input, Port.Capacity.Single, typeof(bool));
+                p.portName = label;
+                p.name = label;
+                conditionPorts.Add(p);
+                _conditionByKey[label] = p;
+                inputContainer.Add(p);
+            }
+
+            // Remove extra ports (from tail only), deleting their edges as real model changes
+            for (int i = currentCount - 1; i >= desiredCount; i--)
+            {
+                int indexInList = i; // +1 because elsePort is at index 0
+                var p = conditionPorts[indexInList];
+
+                // Delete only edges connected to this port (valid model removal)
+                var edges = p.connections?.ToList();
+                if (edges != null && edges.Count > 0 && GraphView != null)
+                {
+                    GraphView.DeleteElements(edges);
+                }
+
+                _conditionByKey.Remove(p.name);
+                outputPorts.RemoveAt(indexInList);
+                inputContainer.Remove(p);
+            }
+        }
 
         private void UpdatePortLabels()
         {
@@ -125,7 +168,7 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
             {
                 int indexInList = 1 + i; // skip elsePort
                 var p = outputPorts[indexInList];
-                var desired = AnswerLabel(i);
+                var desired = $"Answer {i + 1}";
 
                 if (p.name != desired)
                 {
@@ -141,8 +184,29 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
                     _outputsByKey[desired] = p;
                 }
             }
+            
+            for (int i = 0; i < outputPorts.Count - 1; i++)
+            {
+                int indexInList = i;
+                var p = conditionPorts[indexInList];
+                var desired = $"Condition {i + 1}";
+
+                if (p.name != desired)
+                {
+                    // Update dictionary key when renaming
+                    _conditionByKey.Remove(p.name);
+                    p.portName = desired;
+                    p.name = desired;
+                    _conditionByKey[desired] = p;
+                }
+                else
+                {
+                    // Keep dictionary mapping fresh
+                    _conditionByKey[desired] = p;
+                }
+            }
         }
 
-        private static string AnswerLabel(int index) => $"Answer {index + 1}";
+        
     }
 }

@@ -12,7 +12,7 @@ using UnityEngine.Localization.Tables;
 namespace ShadyMax.DialogSystem.Editor.InspectorEditor
 {
     [CustomEditor(typeof(SentenceNodeEditor))]
-    public class SentenceNodeInspector : BaseNodeInspector<SentenceNodeEditor>
+    public class SentenceNodeInspector : BaseNodeChildInspector<SentenceNodeEditor>
     {
         private LocalizationTableCollection _tableCollection;
         private LocalizationTableCollection _audioTableCollection;
@@ -118,7 +118,7 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
             }
 
             AssetTable table = _audioTableCollection.GetTable(locale.Identifier) as AssetTable;
-            if (table == null)
+            if (table == null) 
             {
                 table = _audioTableCollection.AddNewTable(locale.Identifier) as AssetTable;
                 if (table == null)

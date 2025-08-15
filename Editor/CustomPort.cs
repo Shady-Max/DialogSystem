@@ -54,10 +54,20 @@ namespace ShadyMax.DialogSystem.Editor
         
         public void SetColors(params Color[] colors)
         {
-            portColor = FirstColor;
-            _colors.Clear();
-            _colors.AddRange(colors);
-            _ringElement.SetColors(colors);
+            if (colors.Length == 0)
+            {
+                portColor = Color.gray;
+                _colors.Clear();
+                _ringElement.SetColors(new Color[] {Color.gray});
+            }
+            else
+            {
+                portColor = FirstColor;
+                _colors.Clear();
+                _colors.AddRange(colors);
+                _ringElement.SetColors(colors);
+            }
+            
         }
 
         public new static CustomPort Create<TEdge>(Orientation orientation, Direction direction, Capacity capacity, Type type) where TEdge : Edge, new()
@@ -69,17 +79,17 @@ namespace ShadyMax.DialogSystem.Editor
             return port;
         }
         
-        public void AddAllowedDataType<T>()
+        public void AddAllowedDataType(Type type)
         {
-            if (typeof(T) == typeof(bool))
+            if (type == typeof(bool))
             {
                 _colors.Add(new Color(255/255f, 197/255f, 0/255f, 1f));
             }
-            else if (typeof(T) == typeof(string))
+            else if (type == typeof(string))
             {
                 _colors.Add(new Color(8/255f, 255/255f, 93/255f, 1f));
             }
-            else if (typeof(T) == typeof(int) || typeof(T) == typeof(float))
+            else if (type == typeof(int) || type == typeof(float))
             {
                 _colors.Add(new Color(0/255f, 179/255f, 255/255f, 1f));
             }
@@ -87,21 +97,26 @@ namespace ShadyMax.DialogSystem.Editor
             {
                 _colors.Add(Color.gray);
             }
-            _allowedDataTypes.Add(typeof(T));
+            _allowedDataTypes.Add(type);
             SetColors(_colors.ToArray());
         }
-
-        public void RemoveAllowedDataType<T>()
+        
+        public void AddAllowedDataType<T>()
         {
-            if (typeof(T) == typeof(bool))
+            AddAllowedDataType(typeof(T));
+        }
+        
+        public void RemoveAllowedDataType(Type type)
+        {
+            if (type == typeof(bool))
             {
                 _colors.Remove(new Color(255/255f, 197/255f, 0/255f, 1f));
             }
-            else if (typeof(T) == typeof(string))
+            else if (type == typeof(string))
             {
                 _colors.Remove(new Color(8/255f, 255/255f, 93/255f, 1f));
             }
-            else if (typeof(T) == typeof(int) || typeof(T) == typeof(float))
+            else if (type == typeof(int) || type == typeof(float))
             {
                 _colors.Remove(new Color(0/255f, 179/255f, 255/255f, 1f));
             }
@@ -109,7 +124,19 @@ namespace ShadyMax.DialogSystem.Editor
             {
                 _colors.Remove(Color.gray);
             }
-            _allowedDataTypes.Remove(typeof(T));
+            _allowedDataTypes.Remove(type);
+            SetColors(_colors.ToArray());
+        }
+
+        public void RemoveAllowedDataType<T>()
+        {
+            RemoveAllowedDataType(typeof(T));
+        }
+
+        public void ClearAllowedDataTypes()
+        {
+            _colors.Clear();
+            _allowedDataTypes.Clear();
             SetColors(_colors.ToArray());
         }
         

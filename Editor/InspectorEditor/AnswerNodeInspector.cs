@@ -5,17 +5,14 @@ using UnityEngine;
 namespace ShadyMax.DialogSystem.Editor.InspectorEditor
 {
     [CustomEditor(typeof(AnswerNodeEditor))]
-    public class AnswerNodeInspector : BaseNodeInspector<AnswerNodeEditor>
+    public class AnswerNodeInspector : BaseNodeChildInspector<AnswerNodeEditor>
     {
         private bool _changeQueued;
         
         public override void OnInspectorGUI()
         {
-            serializedObject.Update();
-            
-            EditorGUI.BeginChangeCheck();
             base.OnInspectorGUI();
-            bool baseChanged = EditorGUI.EndChangeCheck();
+            serializedObject.Update();
             
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Node Data", EditorStyles.boldLabel);
@@ -26,10 +23,30 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
                 EditorGUI.EndDisabledGroup();
             }
             
+            bool changed = false;
+            
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Block Answers", EditorStyles.boldLabel);
+            using (new EditorGUI.IndentLevelScope())
+            {
+                for (int i = 0; i < _target.answerCount; i++)
+                {
+                    EditorGUI.BeginChangeCheck();
+                    bool newBlockAnswer = EditorGUILayout.Toggle($"Answer {i+1}", _target.blockAnswers[i]);
+                    
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(_target, $"Toggle Block Answer {i + 1}");
+                        _target.blockAnswers[i] = newBlockAnswer;
+                        changed = true;
+                        EditorUtility.SetDirty(_target);
+                    }
+                }
+            }
+
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Node Actions", EditorStyles.boldLabel);
             
-            bool changed = baseChanged;
             using (new EditorGUI.IndentLevelScope())
             {
                 if (GUILayout.Button("Add Answer"))

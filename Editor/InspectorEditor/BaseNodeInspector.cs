@@ -6,14 +6,14 @@ using UnityEngine;
 
 namespace ShadyMax.DialogSystem.Editor.InspectorEditor
 {
-    [CustomEditor(typeof(BaseNodeEditor))]
-    public class BaseNodeInspector<T> : UnityEditor.Editor where T : BaseNodeEditor
+    [CustomEditor(typeof(BaseNodeEditor), true)]
+    public class BaseNodeInspector : UnityEditor.Editor
     {
-        protected T _target;
+        protected BaseNodeEditor _baseNodeTarget;
 
         protected void OnEnable()
         {
-            _target = target as T;
+            _baseNodeTarget = (BaseNodeEditor)target;
         }
 
         public override void OnInspectorGUI()
@@ -26,8 +26,8 @@ namespace ShadyMax.DialogSystem.Editor.InspectorEditor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUI.BeginDisabledGroup(true); // Make these read-only
-                EditorGUILayout.Vector2Field("Position", _target.Position);
-                EditorGUILayout.TextField("GUID", _target.Guid);
+                EditorGUILayout.Vector2Field("Position", _baseNodeTarget.Position);
+                EditorGUILayout.TextField("GUID", _baseNodeTarget.Guid);
                 EditorGUI.EndDisabledGroup();
             }
         }

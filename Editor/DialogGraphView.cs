@@ -34,7 +34,8 @@ namespace ShadyMax.DialogSystem.Editor
             {typeof(NotNodeEditor), typeof(NotNodeView)},
             {typeof(AndNodeEditor), typeof(AndNodeView)},
             {typeof(OrNodeEditor), typeof(OrNodeView)},
-            {typeof(VariableGetNodeEditor), typeof(VariableGetNodeView)}
+            {typeof(VariableGetNodeEditor), typeof(VariableGetNodeView)},
+            {typeof(VariableSetNodeEditor), typeof(VariableSetNodeView)}
         };
         
 
@@ -335,9 +336,6 @@ namespace ShadyMax.DialogSystem.Editor
             newNode.Guid = guid;
             newNode.tableReference = _dialogReference.localizationTable;
             newNode.Position = _lastRightClickPosition;
-
-            Debug.Log(newNode != null);
-            Debug.Log(_dialogReference != null);
             
             Undo.RegisterCompleteObjectUndo(new Object[] { newNode, _dialogReference }, "Create Node");
 
