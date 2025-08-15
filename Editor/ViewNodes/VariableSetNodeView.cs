@@ -13,6 +13,8 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
         public CustomPort inputPort;
         public bool portConnected = false;
         
+        private bool _isRemovingEdges = false;
+        
         public override void Initialize(BaseNodeEditor node, DialogGraphView dialogGraphView)
         {
             base.Initialize(node, dialogGraphView);
@@ -74,9 +76,11 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
             if (variableNames.Count == 0)
             {
                 variableNames.Add("---");
+                DropdownField dropdown = new DropdownField("Variable", variableNames, 0);
                 inputPort.ClearAllowedDataTypes();
                 inputPort.AddAllowedDataType<BaseNodeEditor>();
                 inputPort.portType = typeof(BaseNodeEditor);
+                extensionContainer.Add(dropdown);
             }
             else
             {
@@ -85,6 +89,7 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
                 {
                     Undo.RecordObject(node, "Change variable Guid");
                     node.variableGuid = variables[0].guid;
+                    variable = variables[0];
                     EditorUtility.SetDirty(node);
                     GraphView.GraphChanged?.Invoke();
                 }
@@ -136,8 +141,10 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
 
         private void RemoveIncompatibleEdges()
         {
-            if (inputPort == null) return;
+            if (inputPort == null || _isRemovingEdges) return;
 
+            _isRemovingEdges = true;
+            
             var edgesToRemove = new List<Edge>();
 
             foreach (Edge edge in inputPort.connections)
@@ -150,10 +157,10 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
 
             foreach (Edge edge in edgesToRemove)
             {
-                edge.input.Disconnect(edge);
-                edge.output.Disconnect(edge);
-                GraphView.RemoveElement(edge);
+                GraphView.DeleteConnection(edge);
             }
+            
+            _isRemovingEdges = false;
         }
         
         protected override void RefreshUI()

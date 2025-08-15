@@ -107,7 +107,12 @@ namespace ShadyMax.DialogSystem.Editor.ViewNodes
             });
 
             var variable = GraphView.DialogReference.variables.Find(x => x.guid == node.variableGuid);
-            
+            if (variable == null)
+            {
+                Debug.LogWarning("Variable not found, destroying variable get node");
+                GraphView.DeleteElements(new [] {this});
+                return;
+            }
             // Variable name field
             variableNameLabel = new Label(variable.name) ;
             variableNameLabel.style.minWidth = 80;

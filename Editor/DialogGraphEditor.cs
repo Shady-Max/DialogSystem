@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using ShadyMax.DialogSystem.Editor.Nodes;
 using ShadyMax.DialogSystem.Editor.Variables;
@@ -114,28 +115,10 @@ namespace ShadyMax.DialogSystem.Editor
             if (edge == null)
                 return true;
 
-            // Reflect over EdgeData to find any BaseNodeEditor references.
-            // If any referenced node is null or not part of this graph, the edge is invalid.
-            var fields = edge.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            
-            foreach (var field in fields)
-            {
-                if (typeof(BaseNodeEditor).IsAssignableFrom(field.FieldType))
-                {
-                    var node = field.GetValue(edge) as BaseNodeEditor;
+            bool fromNodeExists = nodes.Any(n => n != null && n.Guid == edge.fromNode);
+            bool toNodeExists = nodes.Any(n => n != null && n.Guid == edge.toNode);
 
-                    if (node == null)
-                        return true;
-
-                    if (nodes == null || !nodes.Contains(node))
-                        return true;
-                }
-            }
-
-            // If no node references were found on the edge, we cannot validate it here.
-            // Keep it to avoid false positives (it may be ID-based). If you use IDs,
-            // consider extending this method to validate those IDs against your node list.
-            return false;
+            return !fromNodeExists || !toNodeExists;
         }
 
         

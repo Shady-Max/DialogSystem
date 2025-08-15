@@ -262,6 +262,7 @@ namespace ShadyMax.DialogSystem.Editor
             EditorUtility.SetDirty(_dialogReference);
             GraphChanged?.Invoke();
             AssetDatabase.SaveAssets();
+            LoadGraph(_dialogReference, true);
         }
 
         public void OnVariableRemoved(string variableGuid)
@@ -273,6 +274,7 @@ namespace ShadyMax.DialogSystem.Editor
             EditorUtility.SetDirty(_dialogReference);
             GraphChanged?.Invoke();
             AssetDatabase.SaveAssets();
+            LoadGraph(_dialogReference, true);
         }
         
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)
@@ -439,7 +441,7 @@ namespace ShadyMax.DialogSystem.Editor
             GraphChanged?.Invoke();
         }
         
-        private void DeleteConnection(Edge edge)
+        public void DeleteConnection(Edge edge)
         {
             var outputNode = edge.output.node as Node;
             var inputNode = edge.input.node as Node;
@@ -458,10 +460,6 @@ namespace ShadyMax.DialogSystem.Editor
         
                 EditorUtility.SetDirty(_dialogReference);
             }
-            
-            Debug.Log(edge);
-            Debug.Log(edge.output is CustomPort);
-            Debug.Log(edge.input is CustomPort);
             
             if (edge.output is CustomPort customOutput)
                 customOutput.TriggerPortDisconnect(edge);
@@ -513,10 +511,19 @@ namespace ShadyMax.DialogSystem.Editor
                 EditorUtility.SetDirty(graph);
             }
             
-            foreach (var node in graph.nodes)
+            var nodes = graph.nodes.ToList();
+            
+            foreach (var node in nodes)
             {
                 if (node == null) continue;
-                CreateNodeView(node);
+                //try
+                //{
+                    CreateNodeView(node);
+                //}
+                //catch (Exception ex)
+                //{
+                //    Debug.LogError($"Error creating node {node.name}: {ex.Message}");
+                //}
             }
 
             // Create edges from saved edge data
