@@ -35,7 +35,8 @@ namespace ShadyMax.DialogSystem.Editor
             {typeof(AndNodeEditor), typeof(AndNodeView)},
             {typeof(OrNodeEditor), typeof(OrNodeView)},
             {typeof(VariableGetNodeEditor), typeof(VariableGetNodeView)},
-            {typeof(VariableSetNodeEditor), typeof(VariableSetNodeView)}
+            {typeof(VariableSetNodeEditor), typeof(VariableSetNodeView)},
+            {typeof(FloatNodeEditor), typeof(FloatNodeView)}
         };
         
 
@@ -58,10 +59,10 @@ namespace ShadyMax.DialogSystem.Editor
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
             this.AddManipulator(new RectangleSelector());
-            this.AddManipulator(new ContextualMenuManipulator(evt => nodeCreationRequest?.Invoke(new NodeCreationContext
-            {
-                screenMousePosition = evt.mousePosition
-            })));
+            //this.AddManipulator(new ContextualMenuManipulator(evt => nodeCreationRequest?.Invoke(new NodeCreationContext
+            //{
+            //    screenMousePosition = evt.mousePosition
+            //})));
         }
 
         private void AddGridBackground()

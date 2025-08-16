@@ -39,10 +39,9 @@ namespace ShadyMax.DialogSystem.Editor
                  //new SearchTreeEntry(new GUIContent("Subtract")) {level = 2, userData = typeof(SubtractNodeEditor)},
                  //new SearchTreeEntry(new GUIContent("Multiply")) {level = 2, userData = typeof(MultiplyNodeEditor)},
                  //new SearchTreeEntry(new GUIContent("Divide")) {level = 2, userData = typeof(DivideNodeEditor)},
-                 //new SearchTreeEntry(new GUIContent("Set")) {level = 2, userData = typeof(SetNodeEditor)},
                  
                  new SearchTreeGroupEntry(new GUIContent("Value"), 1),
-                 //new SearchTreeEntry(new GUIContent("Float")) {level = 2, userData = typeof(FloatNodeEditor)},
+                 new SearchTreeEntry(new GUIContent("Float")) {level = 2, userData = typeof(FloatNodeEditor)},
                  //new SearchTreeEntry(new GUIContent("Int")) {level = 2, userData = typeof(IntNodeEditor)},
                  //new SearchTreeEntry(new GUIContent("String")) {level = 2, userData = typeof(StringNodeEditor)},
                  //new SearchTreeEntry(new GUIContent("Bool")) {level = 2, userData = typeof(BoolNodeEditor)},

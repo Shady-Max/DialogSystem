@@ -2,6 +2,7 @@ using ShadyMax.DialogSystem.Editor.Nodes;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace ShadyMax.DialogSystem.Editor.ViewNodes
 {
